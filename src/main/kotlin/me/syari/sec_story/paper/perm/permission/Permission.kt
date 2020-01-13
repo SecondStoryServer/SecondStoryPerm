@@ -6,6 +6,7 @@ import me.syari.sec_story.paper.library.command.CreateCommand.element
 import me.syari.sec_story.paper.library.command.CreateCommand.offlinePlayers
 import me.syari.sec_story.paper.library.command.CreateCommand.onlinePlayers
 import me.syari.sec_story.paper.library.command.CreateCommand.tab
+import me.syari.sec_story.paper.library.init.EventInit
 import me.syari.sec_story.paper.library.init.FunctionInit
 import me.syari.sec_story.paper.library.message.SendMessage.send
 import me.syari.sec_story.paper.library.player.UUIDPlayer
@@ -13,9 +14,12 @@ import me.syari.sec_story.paper.perm.Main.Companion.plugin
 import me.syari.sec_story.paper.perm.sql.SQL.sql
 import org.bukkit.OfflinePlayer
 import org.bukkit.entity.Player
+import org.bukkit.event.EventHandler
+import org.bukkit.event.player.PlayerJoinEvent
+import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.permissions.PermissionAttachment
 
-object Permission: FunctionInit {
+object Permission: FunctionInit, EventInit {
     override fun init() {
         createCmd(
             "perm", "Perm",
@@ -42,32 +46,27 @@ object Permission: FunctionInit {
                 "list" -> {
                     val p = args.getOfflinePlayer(1, true) ?: return@createCmd
                     val s = StringBuilder()
-                    s.appendln("&b[Perm] &fパーミッション一覧")
-                    p.fromCache.forEach { s.appendln("&7- &a$it") }
-                    sender.send(s)
+                    sendList("パーミッション一覧", p.fromCache)
                 }
                 "reload" -> {
                     val p = args.getPlayer(1, true)
                     if (p != null) {
                         p.loadPerm()
-                        sender.send("&b[Perm] &a${p.name}&fのパーミッションをリロードしました")
+                        sendWithPrefix("&a${p.name}&fのパーミッションをリロードしました")
                     } else {
                         getOnlinePlayers().forEach {
                             it.loadPerm()
                         }
-                        sender.send("&b[Perm] &fオンラインプレイヤーのパーミッションをリロードしました")
+                        sendWithPrefix("&fオンラインプレイヤーのパーミッションをリロードしました")
                     }
                 }
                 else -> {
-                    sender.send(
-                        """
-                        &b[Perm] &fコマンド一覧
-                        &7- &a/perm add <Player> &7プレイヤーの権限を追加します
-                        &7- &a/perm remove <Player> &7プレイヤーの権限を削除します
-                        &7- &a/perm list <Player> &7プレイヤーの権限一覧を表示します
-                        &7- &a/perm reload <Player> &7プレイヤーの権限をリロードします
-                        &7- &a/perm reload &7全プレイヤーの権限をリロードします
-                    """.trimIndent()
+                    sendHelp(
+                        "perm add <Player>" to "プレイヤーの権限を追加します",
+                        "perm remove <Player>" to "プレイヤーの権限を削除します",
+                        "perm list <Player>" to "プレイヤーの権限一覧を表示します",
+                        "perm reload <Player>" to "プレイヤーの権限をリロードします",
+                        "perm reload" to "全プレイヤーの権限をリロードします"
                     )
                 }
             }
@@ -101,6 +100,7 @@ object Permission: FunctionInit {
                     res.getString("Perm")?.let { perm.add(it) }
                 }
             }
+            cacheMap[UUIDPlayer(this)] = perm
             return perm
         }
 
@@ -108,9 +108,7 @@ object Permission: FunctionInit {
 
     private val OfflinePlayer.fromCache: Set<String>
         get() {
-            return cacheMap.getOrPut(UUIDPlayer(this)) {
-                fromSQL
-            }
+            return cacheMap.getOrDefault(UUIDPlayer(this), fromSQL)
         }
 
     private fun Player.loadPerm() {
@@ -121,14 +119,12 @@ object Permission: FunctionInit {
         e.permission.forEach { p ->
             perm.setPermission(p, true)
         }
-        fromSQL.forEach { p ->
-            perm.setPermission(p, true)
-        }
         val uuidPlayer = UUIDPlayer(this)
         if(perms.containsKey(uuidPlayer)) {
             unloadPerm()
         }
         perms[uuidPlayer] = perm
+        PermissionLoadedEvent(this, perm.permissions.filter { it.value }.map { it.key }).callEvent()
     }
 
     private fun Player.unloadPerm() {
@@ -142,6 +138,27 @@ object Permission: FunctionInit {
             executeUpdate(
                 "CREATE TABLE IF NOT EXISTS Permission (UUID VARCHAR(36), Perm VARCHAR(255), PRIMARY KEY (UUID, Perm))"
             )
+        }
+    }
+
+    @EventHandler
+    fun on(e: PermissionLoadEvent){
+        e.addPermission(e.player.fromSQL)
+    }
+
+    @EventHandler
+    fun on(e: PlayerJoinEvent){
+        e.player.loadPerm()
+    }
+
+    @EventHandler
+    fun on(e: PlayerQuitEvent){
+        e.player.unloadPerm()
+    }
+
+    fun onEnable(){
+        plugin.server.onlinePlayers.forEach {
+            it.loadPerm()
         }
     }
 }

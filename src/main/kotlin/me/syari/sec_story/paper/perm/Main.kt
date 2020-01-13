@@ -16,8 +16,8 @@ class Main: JavaPlugin() {
     override fun onEnable() {
         plugin = this
         Config.load(server.consoleSender)
-        ProtocolLibrary.getProtocolManager().addPacketListener(CanRunCommand)
-        EventInit.register(this, CanRunCommand)
-        FunctionInit.register(Permission)
+        EventInit.register(this, CanRunCommand, Permission)
+        FunctionInit.register(CanRunCommand, Permission)
+        Permission.onEnable()
     }
 }
