@@ -1,0 +1,4 @@
+rootProject.name = 'SecondStoryPerm'
+
+include("SecondStoryLibrary")
+project(":SecondStoryLibrary").projectDir = file("C:\\Folder\\SecondStory\\plugin\\paper\\1.15.1\\SecondStoryLibrary")

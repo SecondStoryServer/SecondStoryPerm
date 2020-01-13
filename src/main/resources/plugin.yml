@@ -1,0 +1,8 @@
+name: SecondStoryPerm
+version: '1.0'
+api-version: "1.13"
+main: me.syari.sec_story.paper.perm.Main
+author: sya_ri
+depend:
+  - SecondStoryLibrary
+  - ProtocolLib
